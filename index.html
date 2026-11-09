@@ -197,7 +197,105 @@ html,body{min-height:0}#app{min-height:0;overflow:hidden}#app>*{min-height:0}.ma
 @media(max-width:1000px){#app{grid-template-columns:66px 215px minmax(0,1fr)!important}}
 @media(max-width:650px){#app{grid-template-columns:58px minmax(0,1fr)!important}}
 
-</style></head><body>
+
+/* Study Place zoom gate: desktop 100% baseline shows the workspace; ~110% shows Yapora. */
+#studyPlace{display:none;position:fixed;inset:0;z-index:100001;overflow:auto;place-items:center;padding:clamp(18px,4vw,48px);background:radial-gradient(ellipse at 12% 8%,#e0eaff 0,transparent 42%),radial-gradient(ellipse at 92% 88%,#e9e5ff 0,transparent 40%),#f5f7fc;color:#1d2b45;font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#studyPlace .study-shell{width:min(940px,100%);margin:auto}
+#studyPlace .study-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:36px}
+#studyPlace .study-brand{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:800;letter-spacing:-.35px}
+#studyPlace .study-mark{width:39px;height:39px;border-radius:12px;display:grid;place-items:center;background:#e2eaff;color:#4968b6;font-weight:900;font-size:17px}
+#studyPlace .study-top small{color:#75839b;font-size:12px}
+#studyPlace .study-hero{padding:clamp(24px,5vw,48px);border:1px solid #e1e7f1;border-radius:22px;background:linear-gradient(125deg,#fff,#f7f9ff);box-shadow:0 18px 55px #38517d12}
+#studyPlace .study-kicker{color:#607db5;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}
+#studyPlace h1{margin:10px 0 8px;color:#1f3151;font-size:clamp(32px,5vw,48px);line-height:1.08;letter-spacing:-1.5px}
+#studyPlace .study-hero p{max-width:610px;margin:0;color:#697991;font-size:15px}
+#studyPlace .study-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin-top:16px}
+#studyPlace .study-card{min-width:0;padding:20px;border:1px solid #e1e7f1;border-radius:16px;background:#fff;box-shadow:0 10px 30px #38517d0b}
+#studyPlace .study-card h2{margin:0 0 8px;color:#263958;font-size:15px}
+#studyPlace .study-card p{margin:0 0 12px;color:#7b879b;font-size:12px}
+#studyPlace textarea{display:block;width:100%;min-height:145px;resize:vertical;padding:12px;border:1px solid #e0e6f0;border-radius:10px;background:#f8faff;color:#263958;font:13px/1.5 system-ui,sans-serif;outline:none}
+#studyPlace textarea:focus{border-color:#8aa3d8;box-shadow:0 0 0 3px #8aa3d81f}
+#studyPlace .study-check{display:flex;align-items:flex-start;gap:10px;padding:9px 0;color:#52627d;font-size:13px;border-bottom:1px solid #edf0f6}
+#studyPlace .study-check:last-child{border-bottom:0}
+#studyPlace .study-check input{margin:3px 0 0;accent-color:#6a85c3}
+#studyPlace .study-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:17px;color:#8792a5;font-size:11px}
+#studyPlace .study-calibrate{border:0;background:transparent;color:#7083a8;font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:5px}
+#studyPlace .study-calibrate:hover{color:#354f83}
+html.study-mode,html.study-mode body{background:#f5f7fc!important;color:#1d2b45!important;overflow:hidden!important}
+html.study-mode #startupSplash,html.study-mode #auth,html.study-mode #app,html.study-mode #modalRoot,html.study-mode #toastRoot,html.study-mode .connection-gate,html.study-mode .call-stage-root,html.study-mode .toastbox{display:none!important}
+html.study-mode #studyPlace{display:grid!important}
+@media(max-width:650px){#studyPlace .study-top{margin-bottom:22px}#studyPlace .study-grid{grid-template-columns:1fr}#studyPlace .study-footer{align-items:flex-start;flex-direction:column}}
+
+</style>
+<script>(function(){
+  'use strict';
+  var key='yapora.studyplace.zoom.baseline.v1';
+  var dpr=window.devicePixelRatio||1;
+  var baseline=0;
+  try{baseline=Number(localStorage.getItem(key))||0}catch(e){}
+  if(!baseline||!isFinite(baseline)){baseline=dpr;try{localStorage.setItem(key,String(baseline))}catch(e){}}
+  function desktop(){return !!(window.matchMedia&&window.matchMedia('(pointer:fine)').matches)&&Math.max(window.innerWidth||0,(screen&&screen.width)||0)>=700}
+  function update(){
+    var current=window.devicePixelRatio||baseline||1;
+    var ratio=current/(baseline||current);
+    var showYapora=desktop()&&ratio>=1.075;
+    document.documentElement.classList.toggle('study-mode',!showYapora);
+    document.title=showYapora?'Yapora':'Study Place';
+    window.__yaporaStudyZoomState={baseline:baseline,current:current,ratio:ratio,showYapora:showYapora};
+  }
+  window.yaporaSetStudyZoomBaseline=function(){
+    baseline=window.devicePixelRatio||1;
+    try{localStorage.setItem(key,String(baseline))}catch(e){}
+    update();
+  };
+  window.addEventListener('resize',update,{passive:true});
+  window.addEventListener('orientationchange',update,{passive:true});
+  update();
+})();</script>
+</head><body>
+
+<div id="studyPlace" role="main" aria-label="Study Place">
+  <main class="study-shell">
+    <header class="study-top">
+      <div class="study-brand"><span class="study-mark">SP</span><span>Study Place</span></div>
+      <small>Personal learning workspace</small>
+    </header>
+    <section class="study-hero">
+      <div class="study-kicker">Your workspace</div>
+      <h1>Make room to focus.</h1>
+      <p>A quiet place to organise your thoughts, keep notes and plan what you want to work on next.</p>
+    </section>
+    <div class="study-grid">
+      <section class="study-card">
+        <h2>My notes</h2>
+        <p>Your notes are saved in this browser.</p>
+        <textarea id="studyPlaceNotes" placeholder="Write down ideas, reminders or class notes..."></textarea>
+      </section>
+      <section class="study-card">
+        <h2>Study checklist</h2>
+        <p>Small steps make larger projects easier.</p>
+        <label class="study-check"><input type="checkbox" data-study-check="read"><span>Review today's material</span></label>
+        <label class="study-check"><input type="checkbox" data-study-check="notes"><span>Organise my notes</span></label>
+        <label class="study-check"><input type="checkbox" data-study-check="plan"><span>Plan the next task</span></label>
+      </section>
+    </div>
+    <footer class="study-footer">
+      <span>Study Place · Notes and checklist stay on this device.</span>
+      <button type="button" class="study-calibrate" id="studyPlaceCalibrate">Set current zoom as normal</button>
+    </footer>
+  </main>
+</div>
+<script>(function(){
+  var notes=document.getElementById('studyPlaceNotes');
+  var checks=[].slice.call(document.querySelectorAll('[data-study-check]'));
+  try{if(notes)notes.value=localStorage.getItem('yapora.studyplace.notes')||''}catch(e){}
+  if(notes)notes.addEventListener('input',function(){try{localStorage.setItem('yapora.studyplace.notes',notes.value)}catch(e){}});
+  try{var saved=JSON.parse(localStorage.getItem('yapora.studyplace.checks')||'{}');checks.forEach(function(c){c.checked=!!saved[c.dataset.studyCheck]})}catch(e){}
+  checks.forEach(function(c){c.addEventListener('change',function(){var state={};checks.forEach(function(x){state[x.dataset.studyCheck]=x.checked});try{localStorage.setItem('yapora.studyplace.checks',JSON.stringify(state))}catch(e){}})});
+  var calibrate=document.getElementById('studyPlaceCalibrate');
+  if(calibrate)calibrate.addEventListener('click',function(){if(typeof window.yaporaSetStudyZoomBaseline==='function'){window.yaporaSetStudyZoomBaseline();calibrate.textContent='Normal zoom saved'} });
+})();</script>
+
 <div id="startupSplash" role="status" aria-label="Yapora loading">
   <div class="startup-logo-wrap"><svg class="startup-logo" role="img" aria-label="Yapora friendly chat mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="yaporaBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b9c6ff"/><stop offset="1" stop-color="#6558e8"/></linearGradient></defs><rect width="64" height="64" rx="20" fill="url(#yaporaBg)"/><path d="M19 17c-4 0-7 3-7 7v15c0 4 3 7 7 7h4v7l9-7h13c4 0 7-3 7-7V24c0-4-3-7-7-7z" fill="#fff"/><path d="M20 22c-2-5 1-8 5-8 3 0 5 2 6 5M44 22c2-5-1-8-5-8-3 0-5 2-6 5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="25" cy="31" r="3" fill="#554bc0"/><circle cx="39" cy="31" r="3" fill="#554bc0"/><path d="M25 38q7 7 14 0" fill="none" stroke="#554bc0" stroke-width="3" stroke-linecap="round"/><circle cx="47" cy="10" r="3" fill="#e3e7ff"/></svg></div>
   <div class="startup-name">Yapora</div>

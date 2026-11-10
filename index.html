@@ -145,7 +145,7 @@ html,body{min-height:0}#app{min-height:0;overflow:hidden}#app>*{min-height:0}.ma
 .profile-card[data-profile-theme="lavender"] .profile-bio{background:#302846}
 
 
-/* Yapora v1.7.5: admin access, expanded server settings, and simpler profile music. */
+/* Yapora v1.7.6: admin access, expanded server settings, and simpler profile music. */
 #app{grid-template-columns:72px 238px minmax(0,1fr)!important}
 .members{display:none!important}
 #membersToggle{display:none!important}
@@ -201,7 +201,7 @@ html,body{min-height:0}#app{min-height:0;overflow:hidden}#app>*{min-height:0}.ma
 <div id="startupSplash" role="status" aria-label="Yapora loading">
   <div class="startup-logo-wrap"><svg class="startup-logo" role="img" aria-label="Yapora friendly chat mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="yaporaBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b9c6ff"/><stop offset="1" stop-color="#6558e8"/></linearGradient></defs><rect width="64" height="64" rx="20" fill="url(#yaporaBg)"/><path d="M19 17c-4 0-7 3-7 7v15c0 4 3 7 7 7h4v7l9-7h13c4 0 7-3 7-7V24c0-4-3-7-7-7z" fill="#fff"/><path d="M20 22c-2-5 1-8 5-8 3 0 5 2 6 5M44 22c2-5-1-8-5-8-3 0-5 2-6 5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="25" cy="31" r="3" fill="#554bc0"/><circle cx="39" cy="31" r="3" fill="#554bc0"/><path d="M25 38q7 7 14 0" fill="none" stroke="#554bc0" stroke-width="3" stroke-linecap="round"/><circle cx="47" cy="10" r="3" fill="#e3e7ff"/></svg></div>
   <div class="startup-name">Yapora</div>
-  <div class="startup-tagline">Welcome to Yapora</div><div class="startup-version">v1.7.5 · Admin tools, music status, communities</div>
+  <div class="startup-tagline">Welcome to Yapora</div><div class="startup-version">v1.7.6 · Admin tools, music status, communities</div>
   <div class="startup-accent" aria-hidden="true"></div>
 </div>
 <script>(function(){var splash=document.getElementById('startupSplash');if(!splash)return;window.setTimeout(function(){splash.classList.add('leaving');window.setTimeout(function(){splash.remove()},650)},1700)})();</script>
@@ -391,7 +391,7 @@ function fcOpenDM(k){k=String(k||'').toLowerCase();if(!k||k===current)return;vie
 function createGroupChat(){
   const candidates=new Map();
   for(const key of (user()?.friends||[])){
-    if(key&&key!==current)candidates.set(String(key).toLowerCase(),db.users[key]||fcOnlineByKey(key)||{username:key});
+    if(key&&key!==current&&!db.users[key]?.isApp)candidates.set(String(key).toLowerCase(),db.users[key]||fcOnlineByKey(key)||{username:key});
   }
   for(const [key,account] of Object.entries(db.users||{})){
     if(key!==current&&account&&!account.directoryCached)candidates.set(String(key).toLowerCase(),account);
@@ -671,7 +671,7 @@ $('searchBox').oninput=()=>{const q=$('searchBox').value.toLowerCase();document.
 function init(){fcEnsureOfficialOwnerAccount();fcLocalDeviceId();if(db.session&&db.users[db.session]&&!(db.users[db.session].revokedDevices||[]).includes(fcLocalDeviceId())){current=db.session;fcRecordCurrentDevice(user());save();showApp()}else{db.session=null;try{localStorage.setItem(STORE,JSON.stringify(db))}catch{};$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
 
 /* ---------------- Yapora reliability + requested features ---------------- */
-const FC_APP_VERSION='1.7.5';
+const FC_APP_VERSION='1.7.6';
 let fcEarlyCandidates=new Map();
 let fcPeerRetryAt=new Map();
 let fcActiveVoiceRoom=null;
@@ -1113,6 +1113,176 @@ $('membersToggle').style.display='none';
 $('app').style.gridTemplateColumns='72px 238px minmax(0,1fr)';
 
 const fcSpotifyShowAppBase=showApp;showApp=function(){fcSpotifyShowAppBase();if(current&&user())fcSpotifyStartPolling()};const fcSpotifyInitBase=init;init=function(){fcSpotifyInitBase();fcSpotifyProcessOAuthReturn().then(()=>{if(current&&user())fcSpotifyStartPolling()})};
+
+/* ---------------- Server APP bots (v1.7.6) ----------------
+   Bots are executed by the server owner's connected device because this build
+   uses peer-to-peer sync rather than a hosted, authoritative server backend. */
+const fcBotStyle=document.createElement('style');
+fcBotStyle.textContent='.app-name-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:2px 5px;border-radius:5px;background:#2998ff;color:#fff;font-size:9px;font-weight:900;letter-spacing:.35px;vertical-align:middle;line-height:1.2}.app-name-badge .app-check{font-size:10px}.bot-row{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}.bot-row img{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#50566d}.bot-row-copy{flex:1;min-width:0}.bot-row-copy small{display:block;color:var(--muted);margin-top:3px}.bot-actions{display:flex;gap:6px;flex-wrap:wrap}.bot-permissions{display:grid;gap:7px}.bot-permissions .toggle{padding:8px 10px;background:var(--panel2);border-radius:8px}.bot-code-note{font-size:11px;color:var(--muted);line-height:1.5}';
+document.head.append(fcBotStyle);
+function fcBotEnsureServer(srv){
+  if(!srv)return null;
+  srv.bots=Array.isArray(srv.bots)?srv.bots:[];
+  srv.bannedMembers=srv.bannedMembers&&typeof srv.bannedMembers==='object'?srv.bannedMembers:{};
+  srv.memberRemovals=srv.memberRemovals&&typeof srv.memberRemovals==='object'?srv.memberRemovals:{};
+  srv.botWarnings=srv.botWarnings&&typeof srv.botWarnings==='object'?srv.botWarnings:{};
+  srv.botProcessedMessages=srv.botProcessedMessages&&typeof srv.botProcessedMessages==='object'?srv.botProcessedMessages:{};
+  srv.bots=srv.bots.filter(b=>b&&typeof b==='object'&&typeof b.id==='string').map(b=>({
+    id:String(b.id).slice(0,40),name:String(b.name||'Server Bot').trim().slice(0,32)||'Server Bot',avatar:safeImageURL(b.avatar)||'',enabled:b.enabled!==false,
+    prefix:String(b.prefix||'!').slice(0,3)||'!',minCommandRank:[10,50,80,100].includes(Number(b.minCommandRank))?Number(b.minCommandRank):50,
+    permissions:{sendMessages:b.permissions?.sendMessages!==false,dmMembers:b.permissions?.dmMembers===true,banMembers:b.permissions?.banMembers===true,kickMembers:b.permissions?.kickMembers===true},
+    welcomeDm:b.welcomeDm===true,welcomeText:String(b.welcomeText||'').slice(0,500),
+    autoFilter:b.autoFilter===true,filterAction:['warn','remove','ban'].includes(b.filterAction)?(b.filterAction==='ban'&&b.permissions?.banMembers!==true?'warn':b.filterAction):'warn',
+    blockedWords:Array.isArray(b.blockedWords)?b.blockedWords.map(x=>String(x).trim().slice(0,80)).filter(Boolean).slice(0,40):[],
+    customCommands:String(b.customCommands||'').slice(0,4000),dmCooldowns:b.dmCooldowns&&typeof b.dmCooldowns==='object'?b.dmCooldowns:{}
+  }));
+  return srv;
+}
+function fcBotKey(srv,bot){let h=2166136261;const t=String(srv?.invite||srv?.id||'')+':'+String(bot?.id||'');for(let i=0;i<t.length;i++)h=Math.imul(h^t.charCodeAt(i),16777619);return 'app_'+(h>>>0).toString(36)}
+function fcBotRememberUser(srv,bot){const key=fcBotKey(srv,bot);db.users=db.users||{};db.users[key]={...(db.users[key]||{}),username:String(bot.name||'Server Bot').slice(0,32),avatar:safeImageURL(bot.avatar)||'',bio:'Automated server bot for '+String(srv.name||'a Yapora server')+'.',isApp:true,appBot:true,serverBotId:bot.id,serverInvite:srv.invite,friends:[],requests:[],sentRequests:[],servers:[],directoryCached:true};return key}
+function fcBotFind(srv,id){return fcBotEnsureServer(srv)?.bots.find(b=>b.id===String(id))||null}
+function fcBotRank(srv,key){if(String(key||'').toLowerCase()===String(srv?.owner||'').toLowerCase())return 100;const roleName=srv?.memberRoles?.[key]||'Member';return Number(srv?.roles?.find(r=>r.name===roleName)?.rank)||10}
+function fcBotCan(bot,permission,srv,actor){return !!(bot?.enabled&&bot.permissions?.[permission]&&fcBotRank(srv,actor)>=(bot.minCommandRank||50))}
+function fcBotMember(srv,input){const raw=String(input||'').replace(/^@/,'').toLowerCase();if(!raw)return null;return (srv.members||[]).find(k=>String(k).toLowerCase()===raw||String(db.users[k]?.username||fcOnlineByKey(k)?.username||'').toLowerCase()===raw)||null}
+function fcBotPost(srv,channelName,bot,text){if(!srv||!bot?.enabled||!bot.permissions?.sendMessages)return false;const ch=srv.channels?.[channelName];if(!ch)return false;const body=String(text||'').trim().slice(0,1800);if(!body)return false;const id=uid(),key=fcBotRememberUser(srv,bot),time=Date.now();const m={id,author:key,name:bot.name,avatar:bot.avatar||'',text:body,image:'',time,reactions:[],appBot:true,botId:bot.id};ch.messages=ch.messages||[];ch.messages.push(m);for(const member of (srv.members||[])){if(member===current)continue;fcQueueForUser(member,{type:'server-message',serverInvite:srv.invite,channel:channelName,from:current,fromName:user()?.username||current,to:member,id,time,text:body,image:'',reactions:[],appBot:true,botId:bot.id,botName:bot.name,botAvatar:bot.avatar||''})}save();if(view.type==='server'&&view.id===srv.id&&view.channel===channelName)refreshMessages();return true}
+function fcBotSendDM(srv,bot,target,text,isWelcome=false){
+  if(!srv||!bot?.enabled||!bot.permissions?.dmMembers||!(srv.members||[]).includes(target))return false;
+  const body=String(text||'').trim().slice(0,1200);if(!body)return false;
+  const last=Number(bot.dmCooldowns?.[target]||0);if(Date.now()-last<60000)return false;
+  bot.dmCooldowns=bot.dmCooldowns||{};bot.dmCooldowns[target]=Date.now();
+  const sent=fcQueueForUser(target,{type:'server-bot-dm',serverInvite:srv.invite,botId:bot.id,botName:bot.name,botAvatar:bot.avatar||'',text:body,isWelcome:!!isWelcome,id:uid(),time:Date.now(),from:current,to:target});
+  save();return sent>0||!!db.outbox[Object.keys(db.outbox||{}).find(k=>db.outbox[k]?.type==='server-bot-dm'&&db.outbox[k]?.botId===bot.id&&db.outbox[k]?.to===target)];
+}
+function fcBotSync(srv,includeRoster=false){if(!srv||srv.owner!==current)return;fcBotEnsureServer(srv);srv.updatedAt=Date.now();for(const bot of srv.bots)fcBotRememberUser(srv,bot);save();fcSendServerInfo(srv);for(const member of (srv.members||[])){if(member===current)continue;if(includeRoster)fcQueueForUser(member,{type:'server-state',serverInvite:srv.invite,server:fcClone(srv),from:current,to:member,_outboxStoreKey:'botstate:'+srv.invite+':'+srv.updatedAt+':'+member});fcQueueForUser(member,{type:'server-bots-update',serverInvite:srv.invite,bots:fcClone(srv.bots),bannedMembers:fcClone(srv.bannedMembers),memberRemovals:fcClone(srv.memberRemovals),updatedAt:srv.updatedAt,from:current,to:member,_outboxStoreKey:'bots:'+srv.invite+':'+srv.updatedAt+':'+member})}}
+function fcBotPunish(srv,bot,target,action,reason,sourceKey='',auto=false){if(!srv||!bot||!['ban','kick'].includes(action))return false;if(!target||target===srv.owner||!(srv.members||[]).includes(target))return false;const targetRank=fcBotRank(srv,target),actorRank=fcBotRank(srv,sourceKey);if(!sourceKey||targetRank>=Number(bot.minCommandRank||50)||(!auto&&targetRank>=actorRank))return false;if(action==='ban'&&!bot.permissions?.banMembers)return false;if(action==='kick'&&!bot.permissions?.kickMembers)return false;const cleanReason=String(reason||('Bot '+action)).trim().slice(0,300)||('Bot '+action);if(action==='ban'){srv.bannedMembers[target]={username:db.users[target]?.username||fcOnlineByKey(target)?.username||target,reason:cleanReason,byBot:bot.id,at:Date.now()}}
+  srv.memberRemovals=srv.memberRemovals||{};srv.memberRemovals[target]={action,reason:cleanReason,byBot:bot.id,at:Date.now()};
+  fcQueueForUser(target,{type:action==='ban'?'server-bot-ban':'server-bot-kick',serverInvite:srv.invite,botId:bot.id,botName:bot.name,reason:cleanReason,from:current,to:target,id:uid()});
+  srv.members=(srv.members||[]).filter(k=>k!==target);if(srv.memberRoles)delete srv.memberRoles[target];fcBotSync(srv,true);for(const member of (srv.members||[])){if(member===current)continue;fcQueueForUser(member,{type:'server-bot-roster-remove',serverInvite:srv.invite,botId:bot.id,target,action,reason:cleanReason,from:current,to:member,id:uid()})}return true;
+}
+function fcBotDeleteMessage(srv,bot,channelName,messageId){const ch=srv?.channels?.[channelName];if(!ch)return;ch.messages=(ch.messages||[]).filter(m=>m.id!==messageId);for(const member of (srv.members||[])){if(member===current)continue;fcQueueForUser(member,{type:'server-bot-message-delete',serverInvite:srv.invite,botId:bot.id,channel:channelName,messageId,from:current,to:member,id:uid()})}save();if(view.type==='server'&&view.id===srv.id&&view.channel===channelName)refreshMessages()}
+function fcBotCommandsText(bot){return String(bot.customCommands||'').split(/\r?\n/).map(line=>{const n=line.indexOf('=');return n>0?{trigger:line.slice(0,n).trim(),response:line.slice(n+1).trim()}:null}).filter(x=>x&&x.trigger&&x.response)}
+function fcBotProcessMessage(srv,m){
+  if(!srv||srv.owner!==current||!m||m.appBot||!m.author||(srv.members||[]).indexOf(m.author)<0)return;
+  fcBotEnsureServer(srv);if(m.id&&srv.botProcessedMessages[m.id])return;if(m.id){srv.botProcessedMessages[m.id]=Date.now();const ids=Object.entries(srv.botProcessedMessages).sort((a,b)=>b[1]-a[1]).slice(0,500);srv.botProcessedMessages=Object.fromEntries(ids)}const text=String(m.text||'').trim();if(!text){save();return}
+  for(const bot of srv.bots){if(!bot.enabled)continue;
+    const actor=m.author,actorRank=fcBotRank(srv,actor);
+    if(bot.autoFilter&&bot.blockedWords.length&&actorRank<(bot.minCommandRank||50)){
+      const low=text.toLowerCase(),matched=bot.blockedWords.find(w=>w&&low.includes(w.toLowerCase()));
+      if(matched){const reason='Matched the server filter: '+matched;if(bot.filterAction==='remove'||bot.filterAction==='ban')fcBotDeleteMessage(srv,bot,view.channel===undefined?'general':(m.channel||view.channel||'general'),m.id);
+        if(bot.filterAction==='ban'&&bot.permissions.banMembers){fcBotPunish(srv,bot,actor,'ban',reason,actor,true);}
+        fcBotPost(srv,m.channel||view.channel||'general',bot,'@'+(db.users[actor]?.username||fcOnlineByKey(actor)?.username||actor)+': this message matched the server filter.');return;
+      }
+    }
+    const prefix=bot.prefix||'!';if(!text.startsWith(prefix))continue;
+    const bits=text.slice(prefix.length).trim().split(/\s+/),command=String(bits.shift()||'').toLowerCase(),arg=bits;
+    if(!command)continue;
+    const say=t=>fcBotPost(srv,m.channel||view.channel||'general',bot,t);
+    if(command==='help'){say('Commands: '+prefix+'ping, '+prefix+'rules, '+prefix+'members, '+prefix+'warn @member reason, '+prefix+'kick @member reason, '+prefix+'ban @member reason, '+prefix+'unban @member, '+prefix+'dm @member message.');return}
+    if(command==='ping'){say('Pong.');return}
+    if(command==='rules'){say(srv.settings?.rules||'This server has not published rules yet.');return}
+    if(command==='members'){const names=(srv.members||[]).slice(0,20).map(k=>'@'+(db.users[k]?.username||fcOnlineByKey(k)?.username||k));say('Members ('+(srv.members||[]).length+'): '+names.join(', ')+((srv.members||[]).length>20?' …':'') );return}
+    if(command==='server'){say(srv.name+' · '+(srv.members||[]).length+' members');return}
+    if(command==='warn'||command==='kick'||command==='ban'){
+      const target=fcBotMember(srv,arg[0]);const reason=arg.slice(1).join(' ')||'Server moderation action';
+      if(!target){say('Usage: '+prefix+command+' @username [reason]');return}
+      if(command==='warn'){
+        if(actorRank<(bot.minCommandRank||50)){say('You do not have the required server role to use this command.');return}
+        srv.botWarnings[target]=srv.botWarnings[target]||[];srv.botWarnings[target].push({by:actor,botId:bot.id,reason,at:Date.now()});srv.botWarnings[target]=srv.botWarnings[target].slice(-30);save();say('Warning recorded for @'+(db.users[target]?.username||target)+': '+reason);return;
+      }
+      const perm=command==='ban'?'banMembers':'kickMembers';if(!fcBotCan(bot,perm,srv,actor)){say('This bot command is disabled or your role is too low.');return}
+      if(!fcBotPunish(srv,bot,target,command,reason,actor)){say('That member cannot be '+(command==='ban'?'banned':'kicked')+' with your current role.');return}
+      say('@'+(db.users[target]?.username||target)+' was '+(command==='ban'?'banned':'kicked')+'. Reason: '+reason);return;
+    }
+    if(command==='unban'){
+      if(!fcBotCan(bot,'banMembers',srv,actor)){say('Unban is disabled or your role is too low.');return}
+      const raw=String(arg[0]||'').replace(/^@/,'').toLowerCase();const target=Object.keys(srv.bannedMembers||{}).find(k=>k===raw||String(srv.bannedMembers[k]?.username||'').toLowerCase()===raw);if(!target){say('That member is not on this server’s bot-ban list.');return}
+      const displayName=srv.bannedMembers[target]?.username||db.users[target]?.username||target;delete srv.bannedMembers[target];if(srv.memberRemovals?.[target]?.action==='ban')delete srv.memberRemovals[target];fcBotSync(srv);say('@'+displayName+' has been unbanned and may rejoin with an invite.');return;
+    }
+    if(command==='dm'){
+      if(!fcBotCan(bot,'dmMembers',srv,actor)){say('Bot DMs are disabled or your role is too low.');return}
+      const target=fcBotMember(srv,arg[0]),message=arg.slice(1).join(' ');if(!target||!message){say('Usage: '+prefix+'dm @username message');return}
+      if(!fcBotSendDM(srv,bot,target,message)){say('The DM could not be queued. Check that the person is a server member and the bot DM cooldown has expired.');return}
+      say('Sent a direct message to @'+(db.users[target]?.username||target)+'.');return;
+    }
+    const custom=fcBotCommandsText(bot).find(x=>x.trigger.toLowerCase()===text.split(/\s+/)[0].toLowerCase());
+    if(custom){say(custom.response.replace(/\{user\}/gi,db.users[actor]?.username||actor).replace(/\{server\}/gi,srv.name));return}
+    return;
+  }
+}
+function fcBotWelcome(srv,member){if(!srv||srv.owner!==current)return;fcBotEnsureServer(srv);for(const bot of srv.bots){if(bot.enabled&&bot.welcomeDm&&bot.permissions.dmMembers){const message=bot.welcomeText||('Welcome to '+srv.name+'!');fcBotSendDM(srv,bot,member,message,true);break}}}
+function fcBotOpenManager(serverId){const srv=fcBotEnsureServer(db.servers[serverId]);if(!srv||!can(srv,'manage'))return toast('You need server management permission to manage bots.','bad');const rows=srv.bots.map(bot=>`<div class="bot-row"><img src="${esc(avatar({username:bot.name,avatar:bot.avatar}))}" alt=""><div class="bot-row-copy"><strong>${esc(bot.name)} <span class="app-name-badge">APP <span class="app-check">✓</span></span></strong><small>${bot.enabled?'Enabled':'Paused'} · ${bot.permissions.dmMembers?'DMs on':'DMs off'} · ${bot.permissions.banMembers?'Ban on':'Ban off'}</small></div><div class="bot-actions"><button class="subtle" data-bot-edit="${esc(bot.id)}">Edit</button><button class="subtle" data-bot-toggle="${esc(bot.id)}">${bot.enabled?'Pause':'Enable'}</button><button class="subtle" data-bot-delete="${esc(bot.id)}">Delete</button></div></div>`).join('');openModal('Server bots',`${rows||'<div class="empty">No bots have been created for this server.</div>'}<div class="bot-code-note">Bots use the APP label and verified checkmark automatically. Commands are handled by the server owner’s device while it is connected.</div><button class="primary" id="createServerBot">Create a bot</button>`,null);$('createServerBot').onclick=()=>fcBotEditor(serverId,null);document.querySelectorAll('[data-bot-edit]').forEach(b=>b.onclick=()=>fcBotEditor(serverId,b.dataset.botEdit));document.querySelectorAll('[data-bot-toggle]').forEach(b=>b.onclick=()=>{const bot=fcBotFind(srv,b.dataset.botToggle);if(!bot)return;bot.enabled=!bot.enabled;fcBotSync(srv);fcBotOpenManager(serverId)});document.querySelectorAll('[data-bot-delete]').forEach(b=>b.onclick=()=>{const bot=fcBotFind(srv,b.dataset.botDelete);if(!bot)return;if(!confirm('Delete '+bot.name+' from this server?'))return;srv.bots=srv.bots.filter(x=>x.id!==bot.id);fcBotSync(srv);fcBotOpenManager(serverId)})}
+function fcBotEditor(serverId,botId){const srv=fcBotEnsureServer(db.servers[serverId]);if(!srv||!can(srv,'manage'))return;const old=fcBotFind(srv,botId)||{id:'',name:'Server Bot',avatar:'',enabled:true,prefix:'!',minCommandRank:50,permissions:{sendMessages:true,dmMembers:false,banMembers:false,kickMembers:false},welcomeDm:false,welcomeText:'',autoFilter:false,filterAction:'warn',blockedWords:[],customCommands:'',dmCooldowns:{}};openModal(botId?'Edit server bot':'Create server bot',`
+<label>Bot name<input class="field" id="botNameInput" maxlength="32" value="${esc(old.name)}" placeholder="Community Helper" required></label>
+<label>Profile picture URL<input class="field" id="botAvatarInput" value="${esc(old.avatar||'')}" placeholder="https://example.com/bot-avatar.png"></label>
+<label class="file-label">Upload a profile picture<input type="file" id="botAvatarUpload" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+<label>Command prefix<input class="field" id="botPrefixInput" maxlength="3" value="${esc(old.prefix||'!')}" placeholder="!"></label>
+<label>Minimum role for moderation commands<select class="field" id="botMinRankInput"><option value="10" ${old.minCommandRank===10?'selected':''}>Member</option><option value="50" ${old.minCommandRank===50?'selected':''}>Moderator</option><option value="80" ${old.minCommandRank===80?'selected':''}>Admin</option><option value="100" ${old.minCommandRank===100?'selected':''}>Owner only</option></select></label>
+<div class="setting-block"><h4>Bot permissions</h4><div class="bot-permissions">
+<label class="toggle"><span><strong>Send messages</strong><span class="small muted" style="display:block">Reply in server channels.</span></span><input id="botPermMessages" type="checkbox" ${old.permissions.sendMessages?'checked':''}></label>
+<label class="toggle"><span><strong>Send direct messages</strong><span class="small muted" style="display:block">Send a DM to one server member per command. The !dm command itself is visible in the server channel, so do not type private information there.</span></span><input id="botPermDM" type="checkbox" ${old.permissions.dmMembers?'checked':''}></label>
+<label class="toggle"><span><strong>Ban members</strong><span class="small muted" style="display:block">Allow !ban and the configured filter action.</span></span><input id="botPermBan" type="checkbox" ${old.permissions.banMembers?'checked':''}></label>
+<label class="toggle"><span><strong>Kick members</strong><span class="small muted" style="display:block">Allow !kick.</span></span><input id="botPermKick" type="checkbox" ${old.permissions.kickMembers?'checked':''}></label>
+</div></div>
+<div class="setting-block"><h4>Welcome DM</h4><label class="toggle"><span><strong>Message new members</strong><span class="small muted" style="display:block">Send one welcome DM when someone joins.</span></span><input id="botWelcomeDM" type="checkbox" ${old.welcomeDm?'checked':''}></label><label>Welcome text<textarea class="field" id="botWelcomeText" maxlength="500" placeholder="Welcome to the server!">${esc(old.welcomeText||'')}</textarea></label></div>
+<div class="setting-block"><h4>Automatic word filter</h4><label class="toggle"><span><strong>Enable filter</strong><span class="small muted" style="display:block">Check new server messages against your list.</span></span><input id="botAutoFilter" type="checkbox" ${old.autoFilter?'checked':''}></label><label>Blocked words or phrases<textarea class="field" id="botBlockedWords" maxlength="2000" placeholder="One word or phrase per line">${esc((old.blockedWords||[]).join('\n'))}</textarea></label><label>When a match is found<select class="field" id="botFilterAction"><option value="warn" ${old.filterAction==='warn'?'selected':''}>Warn in the channel</option><option value="remove" ${old.filterAction==='remove'?'selected':''}>Remove the message and warn</option><option value="ban" ${old.filterAction==='ban'?'selected':''} ${old.permissions.banMembers?'':'disabled'}>Remove the message and ban that member from this server</option></select></label><div class="bot-code-note">The filter only applies to members below the selected minimum role. Bans apply to this server only.</div></div>
+<div class="setting-block"><h4>Custom commands</h4><label>One command per line<textarea class="field" id="botCustomCommands" maxlength="4000" placeholder="!links = Server website: https://example.com\n!socials = Check the server links channel">${esc(old.customCommands||'')}</textarea></label><div class="bot-code-note">Format: !trigger = bot response. You can use {user} and {server} in the response. Built-in commands include !help, !ping, !rules, !members, !warn, !kick, !ban, and !dm. Note: !dm command text is visible in the channel; only the bot\’s resulting message is private.</div></div>`,()=>{
+  const name=$('botNameInput').value.trim();if(!name)return toast('Enter a bot name.','bad');const prefix=$('botPrefixInput').value.trim()||'!';if(prefix.length>3||/\s/.test(prefix))return toast('Use a command prefix of 1–3 non-space characters.','bad');if(srv.bots.some(x=>x.id!==botId&&x.enabled&&x.prefix===prefix))return toast('Another enabled bot already uses that prefix. Choose a different prefix.','bad');let avatarValue=$('botAvatarInput').value.trim();if(avatarValue&&!safeImageURL(avatarValue))return toast('Use a valid HTTPS/HTTP image URL or upload a supported image.','bad');const bot=fcBotFind(srv,botId)||{id:uid(),dmCooldowns:{}};Object.assign(bot,{name:name.slice(0,32),avatar:avatarValue,enabled:botId?bot.enabled:true,prefix,minCommandRank:Number($('botMinRankInput').value)||50,permissions:{sendMessages:$('botPermMessages').checked,dmMembers:$('botPermDM').checked,banMembers:$('botPermBan').checked,kickMembers:$('botPermKick').checked},welcomeDm:$('botWelcomeDM').checked,welcomeText:$('botWelcomeText').value.trim().slice(0,500),autoFilter:$('botAutoFilter').checked,filterAction:$('botFilterAction').value,blockedWords:$('botBlockedWords').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,40),customCommands:$('botCustomCommands').value.slice(0,4000),dmCooldowns:bot.dmCooldowns||{}});if(!botId)srv.bots.push(bot);fcBotEnsureServer(srv);fcBotSync(srv);fcBotOpenManager(serverId);
+},botId?'Save bot':'Create bot');$('botAvatarUpload').onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>350000){toast('Choose an image smaller than 350 KB.','bad');e.target.value='';return}const r=new FileReader();r.onload=()=>{$('botAvatarInput').value=String(r.result||'')};r.onerror=()=>toast('Could not read that image.','bad');r.readAsDataURL(file)};$('botPermBan').onchange=()=>{const option=$('botFilterAction').querySelector('option[value="ban"]');option.disabled=!$('botPermBan').checked;if(option.disabled&&$('botFilterAction').value==='ban')$('botFilterAction').value='warn'};
+}
+const fcServerSettingsBeforeBots=serverSettings;
+serverSettings=function(id){fcServerSettingsBeforeBots(id);const srv=db.servers[id],body=$('modalRoot').querySelector('.modal-body');if(!srv||!body||!can(srv,'manage'))return;fcBotEnsureServer(srv);const block=document.createElement('div');block.className='setting-block';block.innerHTML=`<h4>Server bots · ${srv.bots.length}</h4><div class="inline-note">Create app accounts with a custom name and profile picture. Each bot always displays the APP label and verified checkmark.</div><button type="button" class="primary" id="manageServerBots">Manage server bots</button>`;body.append(block);$('manageServerBots').onclick=()=>fcBotOpenManager(id)};
+const fcBotMergeAccountBundleBase=fcMergeAccountBundle;
+fcMergeAccountBundle=function(pack){fcBotMergeAccountBundleBase(pack);if(pack?.servers&&current&&user()){for(const [sid,remote] of Object.entries(pack.servers)){const local=db.servers?.[sid];if(local&&remote){local.bots=fcBotEnsureServer({...local,bots:remote.bots}).bots;local.bannedMembers={...(remote.bannedMembers||local.bannedMembers||{})};local.memberRemovals={...(local.memberRemovals||{}),...(remote.memberRemovals||{})};for(const k of Object.keys(local.memberRemovals))local.members=(local.members||[]).filter(m=>m!==k);local.botWarnings={...(remote.botWarnings||local.botWarnings||{})};local.botProcessedMessages={...(local.botProcessedMessages||{}),...(remote.botProcessedMessages||{})}}}save()}};
+const fcVerifiedMarkBeforeBots=verifiedMark;
+verifiedMark=function(u){if(u?.isApp||u?.appBot)return '<span class="app-name-badge" title="Verified APP bot">APP <span class="app-check">✓</span></span>';return fcVerifiedMarkBeforeBots(u)};
+const fcRenderMessageBeforeBots=renderMessage;
+renderMessage=function(m){if(m?.appBot){const srv=Object.values(db.servers||{}).find(s=>s.invite===m.serverInvite)||Object.values(db.servers||{}).find(s=>(s.bots||[]).some(b=>b.id===m.botId));const bot=srv&&fcBotFind(srv,m.botId);if(bot)fcBotRememberUser(srv,bot);else if(m.author&&m.name)db.users[m.author]={...(db.users[m.author]||{}),username:m.name,avatar:safeImageURL(m.avatar)||'',isApp:true,appBot:true}}fcRenderMessageBeforeBots(m);if(m?.appBot){const el=Array.from(document.querySelectorAll('.message')).find(x=>x.dataset.id===m.id);const label=el?.querySelector('.msg-author');if(label){if(!label.parentElement.querySelector('.app-name-badge'))label.insertAdjacentHTML('afterend',verifiedMark(db.users[m.author]||{isApp:true}));label.onclick=()=>{}}const pic=el?.querySelector('.msg-avatar');if(pic)pic.onclick=()=>{}}};
+const fcSendMessageBeforeAppBots=sendMessage;
+sendMessage=function(text,image=''){if(view.type==='dm'&&db.users[view.id]?.isApp){toast('APP bot DMs are automated and cannot receive replies.');return}const before=view.type==='server'?messagesForView().length:0,sid=view.type==='server'?view.id:null,channel=view.type==='server'?view.channel:null;fcSendMessageBeforeAppBots(text,image);if(sid&&view.type==='server'&&view.id===sid&&view.channel===channel){const arr=messagesForView();if(arr.length>before){const message=arr[arr.length-1];if(message?.author===current&&!message.appBot)fcBotProcessMessage(db.servers[sid],{...message,channel})}}};
+const fcRenderViewBeforeAppBots=renderView;
+renderView=function(){fcRenderViewBeforeAppBots();if(view.type==='dm'&&db.users[view.id]?.isApp){$('composerWrap').classList.add('hidden');setTopic(db.users[view.id].username,'APP · automated server bot');$('messageInput').placeholder='This bot does not accept replies'}};
+const fcHandleDataBeforeAppBots=fcHandleData;
+fcHandleData=async function(id,d){
+  if(!d||typeof d!=='object')return;
+  const actor=String(fcOnline[id]?.key||'').toLowerCase();
+  if(d.type==='server-bots-update'&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(srv.owner||'').toLowerCase()||actor!==String(d.from||'').toLowerCase())return;
+    srv.bots=fcBotEnsureServer({...srv,bots:d.bots}).bots;for(const bot of srv.bots)fcBotRememberUser(srv,bot);srv.bannedMembers={...(d.bannedMembers||{})};srv.memberRemovals={...(d.memberRemovals||{})};for(const k of Object.keys(srv.memberRemovals))srv.members=(srv.members||[]).filter(m=>m!==k);srv.updatedAt=Math.max(srv.updatedAt||0,Number(d.updatedAt)||0);save();renderShell();if(view.type==='dm'&&db.users[view.id]?.isApp)renderView();return;
+  }
+  if(d.type==='server-bot-dm'&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(srv.owner||'').toLowerCase()||actor!==String(d.from||'').toLowerCase()||!(srv.members||[]).includes(current))return;
+    const bot=fcBotFind(srv,d.botId);if(!bot||!bot.enabled||!bot.permissions.dmMembers)return;
+    const key=fcBotRememberUser(srv,bot),dmKeyValue=[current,key].sort().join('::');db.dms[dmKeyValue]=db.dms[dmKeyValue]||[];
+    if(!db.dms[dmKeyValue].some(m=>m.id===d.id))db.dms[dmKeyValue].push({id:d.id||uid(),author:key,name:bot.name,avatar:bot.avatar||'',text:String(d.text||'').slice(0,1200),image:'',time:Number(d.time)||Date.now(),reactions:[],appBot:true,botId:bot.id,isWelcome:!!d.isWelcome});
+    user().friends=Array.from(new Set([...(user().friends||[]),key]));save();fcAcknowledgeIncoming(id,d);renderShell();if(view.type==='dm'&&view.id===key)refreshMessages();else{ping();toast((d.isWelcome?'Welcome DM from ':'Message from ')+bot.name,'good')}return;
+  }
+  if((d.type==='server-bot-ban'||d.type==='server-bot-kick')&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(srv.owner||'').toLowerCase()||actor!==String(d.from||'').toLowerCase())return;const bot=fcBotFind(srv,d.botId);if(!bot||!bot.enabled||!bot.permissions[d.type==='server-bot-ban'?'banMembers':'kickMembers'])return;
+    srv.members=(srv.members||[]).filter(k=>k!==current);srv.memberRemovals=srv.memberRemovals||{};srv.memberRemovals[current]={action:d.type==='server-bot-ban'?'ban':'kick',reason:String(d.reason||'Server bot moderation action').slice(0,300),at:Date.now(),byBot:bot.id};if(d.type==='server-bot-ban'){srv.bannedMembers=srv.bannedMembers||{};srv.bannedMembers[current]={reason:String(d.reason||'Server bot moderation action').slice(0,300),at:Date.now(),byBot:bot.id}}if(srv.memberRoles)delete srv.memberRoles[current];user().servers=(user().servers||[]).filter(x=>x!==srv.id);save();if(view.type==='server'&&view.id===srv.id){view={type:'home',id:null};renderRail();renderSide();renderView()}renderShell();toast((d.type==='server-bot-ban'?'You were banned from ':'You were removed from ')+srv.name+'. Reason: '+String(d.reason||'Server moderation action'),'bad');fcAcknowledgeIncoming(id,d);return;
+  }
+  if(d.type==='server-bot-roster-remove'&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(srv.owner||'').toLowerCase()||actor!==String(d.from||'').toLowerCase())return;const bot=fcBotFind(srv,d.botId);if(!bot||!bot.enabled||!bot.permissions[d.action==='ban'?'banMembers':'kickMembers'])return;const target=String(d.target||'').toLowerCase();srv.memberRemovals=srv.memberRemovals||{};srv.memberRemovals[target]={action:d.action==='ban'?'ban':'kick',reason:String(d.reason||'Server bot moderation action').slice(0,300),at:Date.now(),byBot:bot.id};srv.members=(srv.members||[]).filter(k=>k!==target);if(srv.memberRoles)delete srv.memberRoles[target];if(d.action==='ban'){srv.bannedMembers=srv.bannedMembers||{};srv.bannedMembers[target]={reason:String(d.reason||'Server bot moderation action').slice(0,300),at:Date.now(),byBot:bot.id}}save();renderShell();if(view.type==='server'&&view.id===srv.id)renderView();return;
+  }
+  if(d.type==='server-bot-message-delete'&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(srv.owner||'').toLowerCase()||actor!==String(d.from||'').toLowerCase())return;const bot=fcBotFind(srv,d.botId);if(!bot||!bot.enabled||!bot.autoFilter)return;const ch=srv.channels?.[d.channel||'general'];if(ch)ch.messages=(ch.messages||[]).filter(m=>m.id!==d.messageId);save();if(view.type==='server'&&view.id===srv.id&&view.channel===(d.channel||'general'))refreshMessages();fcAcknowledgeIncoming(id,d);return;
+  }
+  if(d.type==='server-join-denied'&&String(d.to||'').toLowerCase()===String(current||'').toLowerCase()){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(srv&&actor===String(srv.owner||'').toLowerCase()){srv.members=(srv.members||[]).filter(k=>k!==current);user().servers=(user().servers||[]).filter(x=>x!==srv.id);save();renderShell();if(view.type==='server'&&view.id===srv.id){view={type:'home',id:null};renderView()}}toast(String(d.reason||'You cannot join this server.'),'bad');return;
+  }
+  if(d.type==='server-join'&&d.serverInvite&&d.member){const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite&&x.owner===current);if(srv){fcBotEnsureServer(srv);const member=String(d.member).toLowerCase();if(srv.bannedMembers[member]){fcSendTo(id,{type:'server-join-denied',serverInvite:srv.invite,to:member,from:current,reason:'You are banned from '+srv.name+'.'});return}delete srv.memberRemovals[member]}}
+  if(d.type==='server-message'&&d.serverInvite){
+    const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(!srv||!actor||actor!==String(d.from||'').toLowerCase()||!(srv.members||[]).includes(actor))return;
+    if(d.appBot===true){const bot=fcBotFind(srv,d.botId);if(actor!==String(srv.owner||'').toLowerCase()||!bot||!bot.enabled||!bot.permissions.sendMessages)return}
+  }
+  await fcHandleDataBeforeAppBots(id,d);
+  if(d.type==='server-state'&&d.serverInvite&&d.server){const actorKey=String(fcOnline[id]?.key||'').toLowerCase(),srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite);if(srv&&actorKey===String(srv.owner||'').toLowerCase()){srv.bots=fcBotEnsureServer({...srv,bots:d.server.bots}).bots;srv.bannedMembers={...(d.server.bannedMembers||{})};srv.memberRemovals={...(d.server.memberRemovals||{})};for(const k of Object.keys(srv.memberRemovals))srv.members=(srv.members||[]).filter(m=>m!==k);srv.botProcessedMessages={...(srv.botProcessedMessages||{}),...(d.server.botProcessedMessages||{})};save()}}
+  if(d.type==='server-message'&&d.serverInvite){const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite),ch=srv?.channels?.[d.channel||'general'];if(!srv||!ch)return;const m=(ch.messages||[]).find(x=>x.id===d.id);if(!m)return;
+    if(d.appBot===true){const bot=fcBotFind(srv,d.botId);if(!bot)return;const key=fcBotRememberUser(srv,bot);m.author=key;m.name=bot.name;m.avatar=bot.avatar||'';m.appBot=true;m.botId=bot.id;save();if(view.type==='server'&&view.id===srv.id&&view.channel===(d.channel||'general'))refreshMessages();}
+    else if(srv.owner===current)fcBotProcessMessage(srv,{...m,channel:d.channel||'general'});
+  }
+  if(d.type==='server-join'&&d.serverInvite&&d.member){const srv=Object.values(db.servers||{}).find(x=>x.invite===d.serverInvite&&x.owner===current);if(srv){fcBotWelcome(srv,String(d.member).toLowerCase());fcBotSync(srv,true)}}
+};
+
 window.addEventListener('beforeunload',()=>fcStop());window.addEventListener('online',()=>{if(current&&user()&&!fcStarted)fcStart()});window.addEventListener('storage',()=>{db=loadDB();if(current&&db.users[current]){renderShell();renderView()}});init();
 })();
 </script></body></html>
